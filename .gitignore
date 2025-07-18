@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+src/.env
+.secure-keys
 
 # Database
 data/
@@ -41,6 +43,11 @@ secrets.json
 credentials.json
 *.key
 *.pem
+
+# API Audit Results
+audit-results.json
+dashboard-report.json
+final-health-report.json
 
 # Temporary files
 tmp/

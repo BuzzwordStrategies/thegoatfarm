@@ -1,0 +1,115 @@
+/* Dashboard Styles */
+
+/* Tab buttons */
+.tab-btn {
+    @apply flex-1 px-4 py-2 text-center rounded-lg transition-colors duration-200;
+    @apply hover:bg-gray-700 focus:outline-none;
+}
+
+.tab-btn.active {
+    @apply bg-blue-600 text-white;
+}
+
+/* Tab content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.loading {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Chart container */
+#priceChart {
+    max-height: 300px;
+}
+
+/* Notification animations */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+#notifications > div {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Card hover effects */
+.hover-card {
+    @apply transition-all duration-200;
+}
+
+.hover-card:hover {
+    @apply transform -translate-y-1 shadow-lg;
+}
+
+/* Status indicator pulse */
+@keyframes statusPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    }
+}
+
+.status-pulse {
+    animation: statusPulse 2s infinite;
+}
+
+/* Custom utility classes */
+.text-gradient {
+    @apply bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 640px) {
+    .tab-btn {
+        @apply text-sm px-2;
+    }
+    
+    .tab-btn i {
+        @apply hidden;
+    }
+} 

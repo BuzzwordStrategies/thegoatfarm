@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <!-- Header -->
+    <header class="bg-gray-800 shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold">Crypto Trading Dashboard</h1>
+                    <span id="connectionStatus" class="px-3 py-1 rounded-full text-sm bg-yellow-600">
+                        <i class="fas fa-circle text-xs mr-1"></i> Connecting...
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                        <i class="fas fa-sync-alt mr-2"></i> Refresh
+                    </button>
+                    <div class="relative">
+                        <button id="notificationBtn" class="relative p-2">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span id="notificationBadge" class="absolute -top-1 -right-1 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notifications -->
+    <div id="notifications" class="container mx-auto px-4 py-2 space-y-2"></div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- Tabs -->
+        <div class="mb-6">
+            <div class="flex space-x-1 bg-gray-800 p-1 rounded-lg">
+                <button class="tab-btn active" data-tab="overview">
+                    <i class="fas fa-chart-line mr-2"></i> Overview
+                </button>
+                <button class="tab-btn" data-tab="news">
+                    <i class="fas fa-newspaper mr-2"></i> News Feed
+                </button>
+                <button class="tab-btn" data-tab="social">
+                    <i class="fas fa-share-alt mr-2"></i> Social Bucket
+                </button>
+                <button class="tab-btn" data-tab="signals">
+                    <i class="fas fa-signal mr-2"></i> Trading Signals
+                </button>
+                <button class="tab-btn" data-tab="apis">
+                    <i class="fas fa-server mr-2"></i> API Status
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="tabContent">
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <!-- Market Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400">BTC/USD</p>
+                                <p class="text-2xl font-bold" id="btcPrice">-</p>
+                            </div>
+                            <i class="fas fa-bitcoin text-3xl text-yellow-500"></i>
+                        </div>
+                        <div class="mt-2 text-sm" id="btcChange">
+                            <span class="text-gray-400">24h:</span> -
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400">Sentiment</p>
+                                <p class="text-2xl font-bold" id="sentiment">-</p>
+                            </div>
+                            <i class="fas fa-chart-pie text-3xl text-blue-500"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div id="sentimentBar" class="bg-green-500 h-2 rounded-full" style="width: 50%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400">Active APIs</p>
+                                <p class="text-2xl font-bold" id="activeApis">0/0</p>
+                            </div>
+                            <i class="fas fa-plug text-3xl text-green-500"></i>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-400">
+                            System Health: <span id="systemHealth" class="text-green-500">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400">Latest Signal</p>
+                                <p class="text-2xl font-bold" id="latestSignal">-</p>
+                            </div>
+                            <i class="fas fa-bullseye text-3xl text-purple-500"></i>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-400">
+                            Confidence: <span id="signalConfidence">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts and Recent Activity -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Price Chart -->
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Price Chart</h3>
+                        <canvas id="priceChart" height="200"></canvas>
+                    </div>
+                    
+                    <!-- Recent News -->
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Latest News</h3>
+                        <div id="recentNews" class="space-y-3 max-h-64 overflow-y-auto">
+                            <p class="text-gray-400">Loading news...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News Feed Tab -->
+            <div id="news" class="tab-content">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold">Crypto News Feed</h2>
+                        <div class="flex space-x-2">
+                            <input type="text" id="newsSearch" placeholder="Search news..." 
+                                   class="px-3 py-2 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select id="newsSource" class="px-3 py-2 bg-gray-700 rounded-lg">
+                                <option value="all">All Sources</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="newsFeed" class="space-y-4 max-h-screen overflow-y-auto">
+                        <p class="text-gray-400">Loading news...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social Bucket Tab -->
+            <div id="social" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Twitter -->
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">
+                                <i class="fab fa-twitter text-blue-400 mr-2"></i> Twitter
+                            </h3>
+                            <button class="text-sm bg-blue-600 px-3 py-1 rounded" onclick="addTwitterAccount()">
+                                <i class="fas fa-plus mr-1"></i> Add Account
+                            </button>
+                        </div>
+                        <div id="twitterFeeds" class="space-y-4">
+                            <p class="text-gray-400">Loading Twitter feeds...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Reddit -->
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">
+                                <i class="fab fa-reddit text-orange-500 mr-2"></i> Reddit
+                            </h3>
+                            <button class="text-sm bg-orange-600 px-3 py-1 rounded" onclick="addSubreddit()">
+                                <i class="fas fa-plus mr-1"></i> Add Subreddit
+                            </button>
+                        </div>
+                        <div id="redditFeeds" class="space-y-4">
+                            <p class="text-gray-400">Loading Reddit feeds...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trading Signals Tab -->
+            <div id="signals" class="tab-content">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Trading Signals</h2>
+                    <div id="signalsList" class="space-y-4">
+                        <p class="text-gray-400">Loading signals...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Status Tab -->
+            <div id="apis" class="tab-content">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">API Status</h2>
+                    <div id="apiStatusGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <p class="text-gray-400 col-span-full">Loading API status...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="dashboard.js"></script>
+</body>
+</html> 

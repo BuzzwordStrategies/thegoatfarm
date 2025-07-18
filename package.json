@@ -1,0 +1,59 @@
+{
+  "name": "crypto-api-integration-audit",
+  "version": "1.0.0",
+  "description": "Comprehensive Crypto API Integration Audit and Dashboard System",
+  "main": "src/run-api-audit.js",
+  "scripts": {
+    "audit": "node src/run-api-audit.js",
+    "test-key-manager": "node src/test-key-manager.js",
+    "test-health-monitor": "node src/test-health-monitor.js",
+    "dashboard": "node src/api-integration-dashboard.js",
+    "export-env": "python src/export_env_for_audit.py",
+    "test-api": "node src/test-api-integration.js",
+    "test-dashboard": "node src/test-dashboard.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "node tests/run-integration-tests.js",
+    "start": "node src/server/index.js",
+    "server": "node src/server/index.js",
+    "dev": "nodemon src/server/index.js",
+    "build": "echo 'No build step required for Node.js app'",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:logs": "pm2 logs"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "axios-retry": "^3.8.0",
+    "cheerio": "^1.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "elliptic": "^6.6.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "opossum": "^9.0.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-jest": "^30.0.4",
+    "chalk": "^5.4.1",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "jest": "^30.0.4",
+    "nodemon": "^3.1.10",
+    "pm2": "^6.0.8"
+  }
+}

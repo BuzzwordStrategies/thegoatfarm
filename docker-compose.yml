@@ -1,12 +1,103 @@
-version: '3'
+version: '3.8'
 
 services:
-  app:
+  # Node.js Dashboard and API Server
+  dashboard:
     build: .
+    container_name: crypto-dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - WS_PORT=3002
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - crypto-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  
+  # Python Trading Bots
+  trading-bots:
+    build: 
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: crypto-trading-bots
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - crypto-network
+    depends_on:
+      - redis
+  
+  # Flask Dashboard (original)
+  flask-dashboard:
+    build: 
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: crypto-flask-dashboard
+    restart: unless-stopped
     ports:
       - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_APP=dashboard/app.py
+    env_file:
+      - .env
     volumes:
       - .:/app
       - ./data:/app/data
-    environment:
-      - PYTHONUNBUFFERED=1 
+    networks:
+      - crypto-network
+    command: ["python", "-m", "flask", "run", "--host=0.0.0.0"]
+  
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: crypto-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - crypto-network
+    command: redis-server --appendonly yes
+  
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: crypto-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./src/components/dashboard:/usr/share/nginx/html
+    depends_on:
+      - dashboard
+    networks:
+      - crypto-network
+
+volumes:
+  redis-data:
+
+networks:
+  crypto-network:
+    driver: bridge 

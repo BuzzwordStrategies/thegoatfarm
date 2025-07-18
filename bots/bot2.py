@@ -35,12 +35,12 @@ class Bot2(threading.Thread):
         
         # Initialize Coinbase exchange via CCXT (V1 API)
         self.exchange = ccxt.coinbase({
-            'apiKey': get_key('coinbase_api_key', master_pass),
-            'secret': get_key('coinbase_secret', master_pass),
+            'apiKey': get_key('COINBASE_KEY_NAME', master_pass) or get_key('coinbase_api_key', master_pass),
+            'secret': get_key('COINBASE_PRIVATE_KEY', master_pass) or get_key('coinbase_secret', master_pass),
             'enableRateLimit': True,
             'options': {
                 'defaultType': 'spot',
-                'version': 'v1'  # Use Coinbase V1 API
+                'version': 'v3'  # Use new Advanced Trade API
             }
         })
         

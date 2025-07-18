@@ -59,13 +59,10 @@ def start_dashboard():
 def check_api_keys(master_pass):
     """Check if API keys are configured"""
     required_keys = [
-        'coinbase_api_key',
-        'coinbase_secret',
-        'taapi_key',  # Updated from twitterapi_io_key
-        'grok_api_key',
-        'coindesk_api_key',  # Optional - Coindesk may work without key
-        'perplexity_api_key',
-        'claude_api_key'
+        'COINBASE_KEY_NAME',      # Updated for new API
+        'COINBASE_PRIVATE_KEY',   # Updated for new API
+        'TAAPI_API_KEY',
+        'ANTHROPIC_API_KEY'
     ]
     
     missing_keys = []
