@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ bot_id | upper | replace('BOT', 'Bot ') }} Details - The GOAT Farm</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Collapsible Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <button class="btn btn-sm btn-dark toggle-btn" onclick="toggleSidebar()">
+                <i class="bi bi-list"></i>
+            </button>
+            <span class="sidebar-title">The GOAT Farm</span>
+        </div>
+        
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/bots">
+                    <i class="bi bi-robot"></i>
+                    <span class="nav-text">Bots</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/api_dashboard">
+                    <i class="bi bi-key"></i>
+                    <span class="nav-text">API Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/api_dashboard">
+                    <i class="bi bi-heart-pulse"></i>
+                    <span class="nav-text">API Health</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/sources">
+                    <i class="bi bi-database"></i>
+                    <span class="nav-text">Sources</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </li>
+        </ul>
+        
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="bi bi-person-circle"></i>
+                <span class="nav-text">{{ session.user }}</span>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="content">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>{{ bot_id | upper | replace('BOT', 'Bot ') }} Details</h1>
+                <a href="/bots" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Overview
+                </a>
+            </div>
+            
+            <!-- Settings Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-sliders"></i> Bot Settings</h4>
+                </div>
+                <div class="card-body">
+                    <form id="settings-form">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Risk Level (%)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="risk_level" 
+                                       value="{{ params.get('risk_level', '1.0') }}"
+                                       min="0.3" 
+                                       max="2.0" 
+                                       step="0.1">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Allocation (%)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="allocation" 
+                                       value="{{ params.get('allocation', '10') }}"
+                                       min="3" 
+                                       max="20" 
+                                       step="1">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Frequency (seconds)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="freq" 
+                                       value="{{ params.get('freq', '60') }}"
+                                       min="1" 
+                                       max="300" 
+                                       step="1">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="active">
+                                    <option value="True" {{ 'selected' if params.get('active', 'True') == 'True' else '' }}>Active</option>
+                                    <option value="False" {{ 'selected' if params.get('active', 'True') == 'False' else '' }}>Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Strategy Rules Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-list-check"></i> Strategy Rules</h4>
+                </div>
+                <div class="card-body">
+                    {{ rules | safe }}
+                </div>
+            </div>
+            
+            <!-- Optimization Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-magic"></i> AI Optimization</h4>
+                </div>
+                <div class="card-body">
+                    <p>Use Claude AI to analyze recent trades and get optimization recommendations.</p>
+                    <form id="optimize-form" class="mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Analysis Period (days)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="days" 
+                                       value="7" 
+                                       min="1" 
+                                       max="30">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Master Password</label>
+                                <input type="password" 
+                                       class="form-control" 
+                                       name="master_pass" 
+                                       placeholder="Required for Claude API">
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-cpu"></i> Optimize with Claude
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- Launch Protocol Button -->
+                    <div class="mt-3">
+                        <button class="btn btn-primary" onclick="launchBot('{{ bot_id }}')">
+                            <i class="bi bi-rocket-takeoff"></i> Launch Protocol
+                        </button>
+                    </div>
+                    
+                    <!-- Recommendations Display -->
+                    <div id="recommendations" style="display: none;">
+                        <h5>Optimization Recommendations</h5>
+                        <div id="recommendations-content" class="alert alert-info"></div>
+                        <button class="btn btn-warning" onclick="applyRecommendations()">
+                            <i class="bi bi-check-circle"></i> Apply Recommendations
+                        </button>
+                    </div>
+                    
+                    <!-- Launch Protocol Results -->
+                    <div id="launch-results" style="display: none;" class="mt-3">
+                        <h5>Launch Protocol Results</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Backtest Results (3 months)</h6>
+                                <div id="backtest-results" class="alert alert-secondary"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Optimized Parameters</h6>
+                                <div id="launch-recommendations" class="alert alert-info"></div>
+                                <button class="btn btn-success" onclick="applyLaunchRecommendations()">
+                                    <i class="bi bi-check-circle"></i> Apply Optimized Parameters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trade Audit Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-journal-text"></i> Trade Audit Log</h4>
+                </div>
+                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                    {{ logs_html | safe }}
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/charts.js"></script>
+    
+    <script>
+        const botId = '{{ bot_id }}';
+        let currentRecommendations = [];
+        let launchRecommendations = {};
+        
+        // Settings form submission
+        document.getElementById('settings-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            // Update each parameter
+            for (let [param, value] of formData.entries()) {
+                if (param === 'active') {
+                    fetch('/update_param', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: `bot=${botId}&param=${param}&value=${value}`
+                    });
+                } else {
+                    updateParam(botId, param, value);
+                }
+            }
+            
+            alert('Settings saved successfully!');
+        });
+        
+        // Optimize form submission
+        document.getElementById('optimize-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            // Show loading state
+            const btn = this.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing...';
+            btn.disabled = true;
+            
+            fetch(`/optimize/${botId}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentRecommendations = data.recommendations;
+                    displayRecommendations(data);
+                } else {
+                    alert('Error: ' + (data.error || 'Optimization failed'));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            })
+            .finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        });
+        
+        function displayRecommendations(data) {
+            const recDiv = document.getElementById('recommendations');
+            const content = document.getElementById('recommendations-content');
+            
+            let html = `<p><strong>Analysis Summary:</strong> Analyzed ${data.trades_analyzed} trades over ${data.days_analyzed} days.</p>`;
+            
+            if (data.recommendations.summary) {
+                html += `<p>${data.recommendations.summary}</p>`;
+            }
+            
+            if (data.recommendations.recommendations && data.recommendations.recommendations.length > 0) {
+                html += '<ul>';
+                data.recommendations.recommendations.forEach(rec => {
+                    html += `<li><strong>${rec.parameter}:</strong> ${rec.current} → ${rec.suggested} (${rec.reason})</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            content.innerHTML = html;
+            recDiv.style.display = 'block';
+        }
+        
+        function applyRecommendations() {
+            fetch('/apply_recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bot_id: botId,
+                    recommendations: currentRecommendations
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status) {
+                    alert('Recommendations applied successfully!');
+                    location.reload();
+                } else {
+                    alert('Error applying recommendations');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function launchBot(botId) {
+            // Show loading state
+            const resultsDiv = document.getElementById('launch-results');
+            resultsDiv.style.display = 'block';
+            document.getElementById('backtest-results').innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Running 3-month backtest...';
+            document.getElementById('launch-recommendations').innerHTML = '';
+            
+            // Get master password if available
+            const masterPass = document.querySelector('input[name="master_pass"]').value || prompt('Enter master password for API access:');
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('master_pass', masterPass);
+            
+            // Launch protocol
+            fetch(`/launch/${botId}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    resultsDiv.style.display = 'none';
+                    return;
+                }
+                
+                // Display backtest results
+                const backtest = data.backtest;
+                const backtestHtml = `
+                    <strong>Performance:</strong><br>
+                    • Initial: $${backtest.initial_capital.toLocaleString()}<br>
+                    • Final: $${backtest.final_portfolio.toLocaleString()}<br>
+                    • Return: <span class="${backtest.total_return >= 0 ? 'text-success' : 'text-danger'}">${backtest.total_return}%</span><br>
+                    • Trades: ${backtest.num_trades}<br>
+                    • Win Rate: ${backtest.win_rate}%<br>
+                    • Sharpe: ${backtest.sharpe_ratio}<br>
+                    • Max Drawdown: ${backtest.max_drawdown}%
+                `;
+                document.getElementById('backtest-results').innerHTML = backtestHtml;
+                
+                // Display recommendations
+                launchRecommendations = data.recommendations;
+                const recHtml = Object.entries(launchRecommendations).map(([key, value]) => {
+                    const current = data.current_params[key.replace('_level', '').replace('ading_', '')] || 'N/A';
+                    return `• ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${current} → <strong>${value}</strong>`;
+                }).join('<br>');
+                document.getElementById('launch-recommendations').innerHTML = recHtml;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error running launch protocol');
+                resultsDiv.style.display = 'none';
+            });
+        }
+        
+        function applyLaunchRecommendations() {
+            fetch('/apply_recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bot_id: botId,
+                    recommendations: launchRecommendations
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status) {
+                    alert('Launch protocol parameters applied successfully!');
+                    location.reload();
+                } else {
+                    alert('Error applying parameters');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+    
+    <style>
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            color: white;
+        }
+        
+        .card-header {
+            background: #2a2a2a;
+            border-bottom: 1px solid #3a3a3a;
+            color: white;
+        }
+        
+        .form-control, .form-select {
+            background: #121212;
+            border: 1px solid #3a3a3a;
+            color: white;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: #1a1a1a;
+            border-color: #90ee90;
+            color: white;
+            box-shadow: 0 0 0 0.2rem rgba(144, 238, 144, 0.25);
+        }
+        
+        .table-dark {
+            background: #121212;
+        }
+        
+        #recommendations-content {
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            color: white;
+        }
+    </style>
+</body>
+</html> 

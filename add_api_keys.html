@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add API Keys - The GOAT Farm</title>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #40E0D0;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+        }
+        button {
+            background: linear-gradient(45deg, #40E0D0, #8A2BE2);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+            width: 100%;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        #message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        .success {
+            background: rgba(144, 238, 144, 0.2);
+            border: 1px solid #90ee90;
+            color: #90ee90;
+        }
+        .error {
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Add Your API Keys</h1>
+        <form id="keyForm">
+            <div class="form-group">
+                <label>Master Password (Required)</label>
+                <input type="password" name="password" value="March3392!" required>
+            </div>
+            
+            <hr style="border-color: rgba(255, 255, 255, 0.1); margin: 2rem 0;">
+            
+            <div class="form-group">
+                <label>Coinbase API Key</label>
+                <input type="text" name="coinbase_api_key" placeholder="Enter your Coinbase API key">
+            </div>
+            
+            <div class="form-group">
+                <label>Coinbase Secret</label>
+                <input type="password" name="coinbase_secret" placeholder="Enter your Coinbase secret">
+            </div>
+            
+            <div class="form-group">
+                <label>TwitterAPI.io Key</label>
+                <input type="text" name="twitterapi_key" placeholder="Enter your TwitterAPI.io key">
+            </div>
+            
+            <div class="form-group">
+                <label>Grok API Key</label>
+                <input type="password" name="grok_api_key" placeholder="Enter your Grok API key">
+            </div>
+            
+            <div class="form-group">
+                <label>Perplexity API Key</label>
+                <input type="password" name="perplexity_api_key" placeholder="Enter your Perplexity API key">
+            </div>
+            
+            <div class="form-group">
+                <label>Claude API Key</label>
+                <input type="password" name="claude_api_key" placeholder="Enter your Claude API key">
+            </div>
+            
+            <div class="form-group">
+                <label>TAAPI.io Pro Key</label>
+                <input type="password" name="taapi_key" placeholder="Enter your TAAPI.io Pro key">
+            </div>
+            
+            <div class="form-group">
+                <label>CoinDesk API Key (Optional)</label>
+                <input type="password" name="coindesk_api_key" placeholder="Enter your CoinDesk API key">
+            </div>
+            
+            <button type="submit">Save API Keys</button>
+        </form>
+        
+        <div id="message"></div>
+    </div>
+    
+    <script>
+        document.getElementById('keyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const urlEncoded = new URLSearchParams(formData).toString();
+            
+            try {
+                const response = await fetch('http://localhost:5000/key_vault', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: urlEncoded,
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                const messageDiv = document.getElementById('message');
+                
+                if (data.success) {
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = 'Success! ' + data.message;
+                    messageDiv.style.display = 'block';
+                    
+                    // Show test results if available
+                    if (data.test_results) {
+                        let resultsText = '\n\nTest Results:\n';
+                        for (const [key, result] of Object.entries(data.test_results)) {
+                            resultsText += `${key}: ${result.status} - ${result.message}\n`;
+                        }
+                        messageDiv.textContent += resultsText;
+                    }
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = 'Error: ' + (data.error || 'Failed to save keys');
+                    messageDiv.style.display = 'block';
+                }
+            } catch (error) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'Error: ' + error.message;
+                messageDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

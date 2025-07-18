@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Health - The GOAT Farm</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+    
+    <!-- Collapsible Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="btn btn-sm btn-dark toggle-btn" onclick="toggleSidebar()">
+                <i class="bi bi-list"></i>
+            </button>
+            <span class="sidebar-title">The GOAT Farm</span>
+        </div>
+        
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/bots">
+                    <i class="bi bi-robot"></i>
+                    <span class="nav-text">Bots</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/api_vault">
+                    <i class="bi bi-key"></i>
+                    <span class="nav-text">API Vault</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/api_health">
+                    <i class="bi bi-heart-pulse"></i>
+                    <span class="nav-text">API Health</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/sources">
+                    <i class="bi bi-database"></i>
+                    <span class="nav-text">Sources</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </li>
+        </ul>
+        
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="bi bi-person-circle"></i>
+                <span class="nav-text">{{ session.user }}</span>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="content">
+        <div class="container-fluid">
+            <h1 class="mb-4"><i class="bi bi-heart-pulse me-2"></i>API Health Monitor</h1>
+            
+            <!-- API Status Grid -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>Coinbase</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="coinbase-status">
+                                <span class="dot red"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('coinbase')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="coinbase-msg">Not tested</small>
+                        <small class="text-muted d-block">Calls today: <span id="coinbase-count">{{ api_counts.coinbase }}</span></small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>TAAPI.io</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="taapi-status">
+                                <span class="dot red"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('taapi')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="taapi-msg">Not tested</small>
+                        <small class="text-muted d-block">Calls today: <span id="taapi-count">{{ api_counts.taapi }}</span></small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>Grok API</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="grok-status">
+                                <span class="dot red"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('grok')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="grok-msg">Not tested</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>Perplexity</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="perplexity-status">
+                                <span class="dot red"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('perplexity')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="perplexity-msg">Not tested</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>Claude (Anthropic)</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="anthropic-status">
+                                <span class="dot red"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('anthropic')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="anthropic-msg">Not tested</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card">
+                        <h6>Coindesk</h6>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h3 id="coindesk-status">
+                                <span class="dot yellow"></span>
+                            </h3>
+                            <button class="btn btn-sm btn-outline-success" onclick="testAPI('coindesk')">
+                                <i class="bi bi-arrow-clockwise"></i> Test
+                            </button>
+                        </div>
+                        <small class="text-muted" id="coindesk-msg">No key required</small>
+                        <small class="text-muted d-block">Calls today: <span id="coindesk-count">{{ api_counts.coindesk }}</span></small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Test All Button -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <button class="btn btn-primary" onclick="testAllAPIs()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>
+                        Test All APIs
+                    </button>
+                    <a href="/api_vault" class="btn btn-secondary ms-2">
+                        <i class="bi bi-key me-2"></i>
+                        Manage API Keys
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Connection Log -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="chart-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-journal-text me-2"></i>
+                            Connection Log
+                        </h5>
+                        <div id="connectionLog" class="p-3 bg-dark text-light rounded" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em;">
+                            <div class="text-muted">Waiting for API tests...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/charts.js"></script>
+    
+    <script>
+        let masterPass = 'March3392!';
+        const log = document.getElementById('connectionLog');
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'success' ? 'text-success' : type === 'error' ? 'text-danger' : 'text-info';
+            log.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function testAPI(api) {
+            const statusEl = document.getElementById(`${api}-status`);
+            const msgEl = document.getElementById(`${api}-msg`);
+            
+            // Show loading
+            statusEl.innerHTML = '<span class="dot yellow"></span>';
+            msgEl.textContent = 'Testing...';
+            addLog(`Testing ${api.toUpperCase()} API...`);
+            
+            // Test the API
+            fetch(`/api_test/${api}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `master_pass=${encodeURIComponent(masterPass)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    statusEl.innerHTML = '<span class="dot green"></span>';
+                    msgEl.textContent = data.message;
+                    addLog(`${api.toUpperCase()}: ${data.message}`, 'success');
+                    
+                    // Update daily count if available
+                    if (data.daily_count !== undefined) {
+                        const countEl = document.getElementById(`${api}-count`);
+                        if (countEl) {
+                            countEl.textContent = data.daily_count;
+                        }
+                    }
+                } else {
+                    statusEl.innerHTML = '<span class="dot red"></span>';
+                    msgEl.textContent = data.message || 'Connection failed';
+                    addLog(`${api.toUpperCase()}: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                statusEl.innerHTML = '<span class="dot red"></span>';
+                msgEl.textContent = 'Network error';
+                addLog(`${api.toUpperCase()}: Network error - ${error.message}`, 'error');
+            });
+        }
+        
+        function testAllAPIs() {
+            // Clear log
+            log.innerHTML = '';
+            addLog('Starting full API health check...');
+            
+            // Test all APIs
+            const apis = ['coinbase', 'taapi', 'grok', 'perplexity', 'anthropic', 'coindesk'];
+            
+            apis.forEach((api, index) => {
+                setTimeout(() => {
+                    testAPI(api);
+                }, index * 1000); // Stagger requests by 1 second
+            });
+        }
+        
+        // Auto-test on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('API Health Monitor initialized');
+            // Test Coindesk immediately (no auth required)
+            setTimeout(() => testAPI('coindesk'), 500);
+        });
+    </script>
+</body>
+</html> 
