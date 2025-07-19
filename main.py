@@ -1,37 +1,40 @@
 import threading
 import time
-import getpass
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from bots.bot1 import Bot1
-from bots.bot2 import Bot2
-from bots.bot3 import Bot3
-from bots.bot4 import Bot4
-from dashboard.app import app
-from utils.db import init_db, get_key
-from utils.optimization import weekly_reallocate, check_bot_active
-from utils.env_loader import get_master_password, has_env_keys, load_all_env_keys
 
 # Load environment variables
 load_dotenv()
 
-# Global bot instances and threads
+from utils.db import init_db
+from utils.env_loader import load_all_env_keys
+from utils.optimization import weekly_reallocate, check_bot_active
+
+# Import bots
+from bots.bot1 import Bot1
+from bots.bot2 import Bot2
+from bots.bot3 import Bot3
+from bots.bot4 import Bot4
+
+# Import Flask app
+from dashboard.app import app
+
+# Bot instances
 bot_instances = {}
 bot_threads = {}
-master_password = None
 
-def start_bots(master_pass):
+def start_bots():
     """Initialize and start all trading bots in separate threads"""
     global bot_instances, bot_threads
     
-    # Initialize bot instances with master password
+    # Initialize bot instances WITHOUT master password
     try:
         print("Initializing bots...")
-        bot_instances['bot1'] = Bot1(master_pass)
-        bot_instances['bot2'] = Bot2(master_pass)
-        bot_instances['bot3'] = Bot3(master_pass)
-        bot_instances['bot4'] = Bot4(master_pass)
+        bot_instances['bot1'] = Bot1()
+        bot_instances['bot2'] = Bot2()
+        bot_instances['bot3'] = Bot3()
+        bot_instances['bot4'] = Bot4()
         
         # Start each bot in its own thread only if active
         for bot_id, bot in bot_instances.items():
@@ -46,7 +49,7 @@ def start_bots(master_pass):
             
     except Exception as e:
         print(f"Error starting bots: {str(e)}")
-        print("Make sure API keys are configured in the database")
+        print("Make sure API keys are configured in .env file")
 
 def start_dashboard():
     """Start Flask dashboard"""
@@ -56,64 +59,79 @@ def start_dashboard():
     # Run Flask app on port 5000
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
-def check_api_keys(master_pass):
+def check_api_keys():
     """Check if API keys are configured"""
     required_keys = [
-        'COINBASE_KEY_NAME',      # Updated for new API
-        'COINBASE_PRIVATE_KEY',   # Updated for new API
-        'TAAPI_API_KEY',
+        ('COINBASE_API_KEY', 'COINBASE_API_KEY_NAME'),  # Either legacy or CDP
+        'TAAPI_SECRET',
+        ('TWITTER_API_KEY', 'TWITTERAPI_KEY'),  # Either name works
+        'SCRAPINGBEE_API_KEY',
+        'XAI_API_KEY',
+        'PERPLEXITY_API_KEY',
         'ANTHROPIC_API_KEY'
     ]
     
     missing_keys = []
     for key in required_keys:
-        if not get_key(key, master_pass):
-            missing_keys.append(key)
+        if isinstance(key, tuple):
+            # Check if any of the alternatives exist
+            found = False
+            for alt_key in key:
+                if os.getenv(alt_key):
+                    found = True
+                    break
+            if not found:
+                missing_keys.append(' or '.join(key))
+        else:
+            # Single key check
+            if not os.getenv(key):
+                missing_keys.append(key)
     
     return missing_keys
 
-if __name__ == '__main__':
-    print("=== Crypto Trading Platform MVP ===")
-    print("Initializing...")
-    
+def stop_bots():
+    """Stop all running bot instances."""
+    for bot_id, bot in bot_instances.items():
+        bot.stop()
+    print("All bots stopped.")
+
+def main():
+    """Main entry point for the trading bot system"""
     # Initialize database
     init_db()
-    print("Database initialized successfully")
     
-    # Check if we have environment variables
-    if has_env_keys():
-        print("\nDetected API keys in environment variables (.env file)")
-        env_keys = load_all_env_keys()
-        print(f"Found {len(env_keys)} API keys in environment")
-        master_password = get_master_password()
-        print(f"Using master password from environment")
-    else:
-        # Get master password for encryption
-        print("\nEnter master password for API key encryption:")
-        master_password = getpass.getpass("Master password: ")
+    # Check environment
+    print("Starting bot system...")
+    print(f"Environment: {os.getenv('NODE_ENV', 'development')}")
     
-    # Check if API keys are configured
-    missing_keys = check_api_keys(master_password)
+    # Load all environment keys
+    all_keys = load_all_env_keys()
+    print(f"\n✓ Loaded {len(all_keys)} environment variables")
+    
+    # Check if we have required API keys
+    missing_keys = check_api_keys()
     if missing_keys:
-        print("\nWARNING: The following API keys are not configured:")
+        print("\n⚠️  Missing API Keys:")
         for key in missing_keys:
             print(f"  - {key}")
-        print("\nYou can configure them via:")
-        print("1. The dashboard after logging in")
-        print("2. Creating a .env file with your API keys")
-        print("\nThe bots will not function properly without API keys.")
-        
-        # Ask if user wants to continue
-        choice = input("\nDo you want to continue anyway? (y/n): ")
-        if choice.lower() != 'y':
-            print("Exiting...")
-            exit(0)
-    else:
-        print("\n✓ All required API keys are configured!")
+        print("\nPlease add these keys to your .env file")
+        return
+    
+    print("\n✓ All required API keys found")
+    
+    # Start WebSocket for real-time data
+    print("\nStarting WebSocket connection...")
+    try:
+        from utils.websocket_client import start_websocket
+        start_websocket()
+        print("✓ WebSocket connected for real-time data")
+    except Exception as e:
+        print(f"Warning: WebSocket connection failed: {str(e)}")
+        print("Bots will use API polling as fallback")
     
     # Start bots in background threads
     print("\nStarting trading bots...")
-    start_bots(master_password)
+    start_bots()  # No master_pass needed
     
     # Start weekly optimization thread
     def optimization_loop():
@@ -123,35 +141,37 @@ if __name__ == '__main__':
                 # Check if it's Monday (0 = Monday)
                 if datetime.now().weekday() == 0:
                     print("\nRunning weekly portfolio optimization...")
-                    if master_password:
-                        weekly_reallocate(master_password)
+                    weekly_reallocate()  # No master_pass needed
                     # Sleep for 24 hours to avoid running multiple times on Monday
                     time.sleep(86400)
                 else:
                     # Check again in 1 hour
                     time.sleep(3600)
             except Exception as e:
-                print(f"Error in optimization loop: {str(e)}")
-                time.sleep(3600)  # Wait 1 hour before retrying
+                print(f"Optimization error: {str(e)}")
+                time.sleep(3600)  # Wait an hour before retry
     
-    optimization_thread = threading.Thread(target=optimization_loop, name="OptimizationThread")
-    optimization_thread.daemon = True
-    optimization_thread.start()
-    print("Started portfolio optimization thread")
+    opt_thread = threading.Thread(target=optimization_loop, name="Optimization")
+    opt_thread.daemon = True
+    opt_thread.start()
+    print("✓ Weekly optimization scheduler started")
     
-    # Give bots a moment to initialize
-    time.sleep(2)
-    
-    # Start dashboard (this will block until the app is stopped)
-    print("\nStarting dashboard on http://localhost:5000")
-    print("Default login: josh / March3392!")
-    print("\nPress Ctrl+C to stop the application")
+    # Keep main thread alive and handle shutdown
+    print("\n" + "="*50)
+    print("Bot system is running!")
+    print("Press Ctrl+C to stop")
+    print("="*50 + "\n")
     
     try:
-        start_dashboard()
+        while True:
+            time.sleep(60)  # Check every minute
+            # You could add status checks here
     except KeyboardInterrupt:
         print("\n\nShutting down...")
-        # Stop all bots
-        for bot_id, bot in bot_instances.items():
-            bot.stop()
-        print("Application stopped.")
+        stop_bots()
+        from utils.websocket_client import stop_websocket
+        stop_websocket()
+        print("Goodbye!")
+
+if __name__ == '__main__':
+    main()

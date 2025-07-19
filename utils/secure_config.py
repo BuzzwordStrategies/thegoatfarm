@@ -46,7 +46,10 @@ class SecureConfigManager:
                 return f.read()
         
         # Generate new key from machine ID
-        password = os.environ.get('SYSTEM_SECRET', 'default-goat-farm-2025').encode()
+        password = os.environ.get('SYSTEM_SECRET')
+        if not password:
+            raise ValueError("SYSTEM_SECRET environment variable is required")
+        password = password.encode()
         salt = b'goat-farm-salt-2025'
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),

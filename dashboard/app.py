@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from utils.db import get_params, set_param, log_trade, get_key, store_key, increment_api_call, get_api_call_count
 from utils.sentiment import get_combined_sentiment, get_coindesk_news
 from utils.env_loader import get_master_password
+from utils.security_fixes import sanitize_decorator, setup_security, add_security_headers, rate_limit_decorator
 from anthropic import Anthropic
 import time
 import json
@@ -29,7 +30,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
-app.secret_key = 'supersecretkey'
+app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey')
+
+# Apply security fixes
+setup_security(app)
+
+# Add security headers to all responses
+@app.after_request
+def apply_security(response):
+    return add_security_headers(response)
 
 # Hardcoded user for MVP
 users = {'josh': generate_password_hash('March3392!')}
@@ -671,6 +680,7 @@ def index():
                          coinbase_balance=coinbase_balance)
 
 @app.route('/update_param', methods=['POST'])
+@sanitize_decorator
 def update_param():
     """Update bot parameter in database"""
     try:

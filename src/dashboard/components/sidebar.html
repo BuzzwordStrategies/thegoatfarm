@@ -1,0 +1,141 @@
+<!-- Glassmorphism Sidebar Component -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-logo">GOAT Farm</div>
+        <button class="sidebar-toggle" onclick="toggleSidebar()">
+            <span id="toggle-icon">☰</span>
+        </button>
+    </div>
+    
+    <nav class="sidebar-nav">
+        <!-- Dashboard -->
+        <div class="nav-item">
+            <a href="#dashboard" class="nav-link active" onclick="navigateTo('dashboard')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+        </div>
+        
+        <!-- Portfolio Performance -->
+        <div class="nav-item">
+            <a href="#portfolio" class="nav-link" onclick="navigateTo('portfolio')">
+                <span class="nav-icon">💼</span>
+                <span class="nav-text">Portfolio Performance</span>
+            </a>
+        </div>
+        
+        <!-- API Integrations -->
+        <div class="nav-item">
+            <a href="#api-integrations" class="nav-link" onclick="navigateTo('api-integrations')">
+                <span class="nav-icon">🔌</span>
+                <span class="nav-text">API Integrations</span>
+            </a>
+        </div>
+        
+        <!-- API Health -->
+        <div class="nav-item">
+            <a href="#api-health" class="nav-link" onclick="navigateTo('api-health')">
+                <span class="nav-icon">❤️</span>
+                <span class="nav-text">API Health</span>
+            </a>
+        </div>
+        
+        <!-- Bots (Expandable) -->
+        <div class="nav-item expandable" id="bots-menu">
+            <a href="#bots" class="nav-link" onclick="toggleBots(event)">
+                <span class="nav-icon">🤖</span>
+                <span class="nav-text">Bots</span>
+            </a>
+            <div class="nav-submenu">
+                <a href="#bot-overview" class="nav-link" onclick="navigateTo('bot-overview')">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">Bot Overview</span>
+                </a>
+                <a href="#bot1" class="nav-link" onclick="navigateTo('bot1')">
+                    <span class="nav-icon">1️⃣</span>
+                    <span class="nav-text">Bot 1: Trend-Following</span>
+                </a>
+                <a href="#bot2" class="nav-link" onclick="navigateTo('bot2')">
+                    <span class="nav-icon">2️⃣</span>
+                    <span class="nav-text">Bot 2: Mean-Reversion</span>
+                </a>
+                <a href="#bot3" class="nav-link" onclick="navigateTo('bot3')">
+                    <span class="nav-icon">3️⃣</span>
+                    <span class="nav-text">Bot 3: News-Driven</span>
+                </a>
+                <a href="#bot4" class="nav-link" onclick="navigateTo('bot4')">
+                    <span class="nav-icon">4️⃣</span>
+                    <span class="nav-text">Bot 4: ML-Powered</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Backtesting -->
+        <div class="nav-item">
+            <a href="#backtesting" class="nav-link" onclick="navigateTo('backtesting')">
+                <span class="nav-icon">⏮️</span>
+                <span class="nav-text">Backtesting</span>
+            </a>
+        </div>
+        
+        <!-- Risk Management -->
+        <div class="nav-item">
+            <a href="#risk-management" class="nav-link" onclick="navigateTo('risk-management')">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-text">Risk Management</span>
+            </a>
+        </div>
+    </nav>
+</div>
+
+<script>
+// Sidebar functionality
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('collapsed');
+    
+    // Update toggle icon
+    const icon = document.getElementById('toggle-icon');
+    icon.textContent = sidebar.classList.contains('collapsed') ? '➤' : '☰';
+}
+
+function toggleBots(event) {
+    event.preventDefault();
+    const botsMenu = document.getElementById('bots-menu');
+    botsMenu.classList.toggle('expanded');
+}
+
+function navigateTo(page) {
+    // Remove active class from all links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to clicked link
+    event.target.closest('.nav-link').classList.add('active');
+    
+    // Emit navigation event
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { page } }));
+    
+    // Update URL hash
+    window.location.hash = page;
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    // Check for collapsed state in localStorage
+    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (isCollapsed) {
+        document.getElementById('sidebar').classList.add('collapsed');
+        document.getElementById('toggle-icon').textContent = '➤';
+    }
+    
+    // Save state on toggle
+    const originalToggle = window.toggleSidebar;
+    window.toggleSidebar = function() {
+        originalToggle();
+        const sidebar = document.getElementById('sidebar');
+        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    };
+});
+</script> 

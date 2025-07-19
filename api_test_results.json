@@ -1,42 +1,42 @@
 {
   "Coinbase API": {
     "success": false,
-    "message": "Error: No module named 'coinbase'",
-    "timestamp": "2025-07-18T21:33:54.128320"
+    "message": "Error: ('Could not deserialize key data. The data may be in an incorrect format, the provided password may be incorrect, it may be encrypted with an unsupported algorithm, or it may be an unsupported key type (e.g. EC curves with explicit parameters).', [<OpenSSLError(code=503841036, lib=60, reason=524556, reason_text=unsupported)>])\nAre you sure you generated your key at https://cloud.coinbase.com/access/api ?",
+    "timestamp": "2025-07-18T23:57:25.412234"
   },
   "TAAPI.io": {
-    "success": false,
-    "message": "Error: Missing TAAPI secret",
-    "timestamp": "2025-07-18T21:33:54.128320"
+    "success": true,
+    "message": "Connected! RSI: 48.36",
+    "timestamp": "2025-07-18T23:57:25.794270"
   },
   "TwitterAPI.io": {
     "success": false,
-    "message": "Error: Missing TwitterAPI key",
-    "timestamp": "2025-07-18T21:33:54.128843"
+    "message": "Error: HTTP 404",
+    "timestamp": "2025-07-18T23:57:26.076078"
   },
   "ScrapingBee": {
     "success": false,
     "message": "Error: No module named 'scrapingbee'",
-    "timestamp": "2025-07-18T21:33:54.129386"
+    "timestamp": "2025-07-18T23:57:26.077073"
   },
   "Grok API": {
     "success": false,
     "message": "Error: No module named 'openai'",
-    "timestamp": "2025-07-18T21:33:54.129905"
+    "timestamp": "2025-07-18T23:57:26.077073"
   },
   "Perplexity AI": {
     "success": false,
     "message": "Error: No module named 'openai'",
-    "timestamp": "2025-07-18T21:33:54.129905"
+    "timestamp": "2025-07-18T23:57:26.078077"
   },
   "Anthropic Claude": {
     "success": false,
     "message": "Error: Client.__init__() got an unexpected keyword argument 'proxies'",
-    "timestamp": "2025-07-18T21:33:54.472868"
+    "timestamp": "2025-07-18T23:57:26.439193"
   },
   "CoinDesk API": {
     "success": false,
-    "message": "Error: HTTPSConnectionPool(host='api.coindesk.com', port=443): Max retries exceeded with url: /v1/bpi/currentprice.json (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x0000017B204DDF50>: Failed to resolve 'api.coindesk.com' ([Errno 11001] getaddrinfo failed)\"))",
-    "timestamp": "2025-07-18T21:33:54.500477"
+    "message": "Error: HTTPSConnectionPool(host='api.coindesk.com', port=443): Max retries exceeded with url: /v1 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x0000026C462F7690>: Failed to resolve 'api.coindesk.com' ([Errno 11001] getaddrinfo failed)\"))",
+    "timestamp": "2025-07-18T23:57:26.512167"
   }
 }

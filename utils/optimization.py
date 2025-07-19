@@ -4,8 +4,13 @@ import json
 from utils.db import get_key, get_params, set_param, log_trade
 import sqlite3
 import pandas as pd
+import os
+from dotenv import load_dotenv
 
-def weekly_reallocate(master_pass: str = None):
+# Load environment variables
+load_dotenv()
+
+def weekly_reallocate():
     """
     Weekly portfolio reallocation using Claude API.
     Analyzes past 7 days performance and reallocates to winning bots.
@@ -61,9 +66,9 @@ def weekly_reallocate(master_pass: str = None):
         con.close()
         
         # Get Claude API key
-        api_key = get_key('claude_api_key', master_pass)
+        api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
-            log_trade('optimization', 'error', 'Claude API key not found')
+            log_trade('optimization', 'error', 'Claude API key not found in environment')
             return
         
         # Initialize Claude client
@@ -124,10 +129,22 @@ def weekly_reallocate(master_pass: str = None):
         
         # Parse Claude's response
         try:
-            parsed = json.loads(response.content[0].text)
+            # Handle different content types
+            content = response.content[0]
+            if hasattr(content, 'text'):
+                text = content.text
+            else:
+                # For ToolUseBlock or other types, convert to string
+                text = str(content)
+                
+            parsed = json.loads(text)
         except:
             # Try to extract JSON from response
-            text = response.content[0].text
+            if hasattr(content, 'text'):
+                text = content.text
+            else:
+                text = str(content)
+                
             start = text.find('{')
             end = text.rfind('}') + 1
             if start >= 0 and end > start:

@@ -1,12 +1,17 @@
 import threading
-import ccxt
 import pandas as pd
 import numpy as np
 import time
 import random
-from utils.db import get_key, log_trade, get_params, set_param
+import os
+import sys
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.base_api_connection import CoinbaseConnection, TaapiConnection
+from utils.db import log_trade, get_params, set_param
 from utils.sentiment import get_combined_sentiment
-from utils.taapi import get_indicator, get_pattern, get_historical
 
 class Bot1(threading.Thread):
     """
@@ -15,237 +20,160 @@ class Bot1(threading.Thread):
     Uses 20/50 SMA crossover, RSI < 30, and sentiment > 0.6
     """
     
-    def __init__(self, master_pass):
+    def __init__(self):
         """Initialize Bot 1 with parameters from database"""
         super().__init__()
-        self.master_pass = master_pass
         
         # Load parameters from database
         self.params = get_params('bot1')
-        self.risk_level = float(self.params.get('risk', '1.0')) / 100  # Convert percentage to decimal (e.g., 0.01 for 1%)
-        self.alloc = float(self.params.get('alloc', '10')) / 100  # Portfolio allocation (e.g., 0.10 for 10%)
+        self.risk_level = float(self.params.get('risk', '1.0')) / 100  # Convert percentage to decimal
+        self.alloc = float(self.params.get('alloc', '10')) / 100  # Portfolio allocation
         self.trade_freq = int(self.params.get('freq', '60'))  # Trading frequency in seconds
         
         # Trading pairs - high liquidity coins
         self.coins = ['BTC/USD', 'ETH/USD']
         self.running = True
         
-        # Initialize Coinbase exchange via CCXT (V1 API)
-        self.exchange = ccxt.coinbase({
-            'apiKey': get_key('COINBASE_KEY_NAME', master_pass) or get_key('coinbase_api_key', master_pass),
-            'secret': get_key('COINBASE_PRIVATE_KEY', master_pass) or get_key('coinbase_secret', master_pass),
-            'enableRateLimit': True,
-            'options': {
-                'defaultType': 'spot',
-                'version': 'v3'  # Use new Advanced Trade API
-            }
-        })
+        # Initialize API connections using new pattern
+        self.coinbase = CoinbaseConnection()
+        self.taapi = TaapiConnection()
         
-        # Set rate limit to avoid 429 errors
-        self.exchange.rateLimit = 1000  # 1 second between requests
+        # Verify connections
+        if not self.coinbase.is_connected:
+            log_trade('bot1', 'error', 'Coinbase connection failed')
+            raise ValueError("Coinbase connection failed")
+            
+        if not self.taapi.is_connected:
+            log_trade('bot1', 'error', 'TAAPI connection failed')
+            raise ValueError("TAAPI connection failed")
+            
+        # Store client for compatibility
+        if hasattr(self.coinbase, 'client'):
+            self.exchange = self.coinbase.client
+        else:
+            log_trade('bot1', 'warning', 'Using CDP authentication - legacy methods may not work')
+            self.exchange = None
+        
+        log_trade('bot1', 'info', 'Bot initialized successfully')
         
     def run(self):
         """Main bot loop: check conditions every trade_freq seconds"""
         while self.running:
             # Check if bot is active from portfolio optimization
-            from utils.optimization import check_bot_active
-            if not check_bot_active('bot1'):
-                log_trade('bot1', 'info', 'Bot deactivated by optimization')
-                self.running = False
-                break
-            try:
+            if self.is_active():
                 for coin in self.coins:
-                    # Convert coin format for TAAPI (BTC/USD -> BTC/USDT)
-                    taapi_symbol = coin.replace('/USD', '/USDT')
-                    
-                    # Get indicators from TAAPI
-                    sma20_data = get_indicator('sma', {
-                        'exchange': 'coinbase',
-                        'symbol': taapi_symbol,
-                        'interval': '1h',
-                        'period': 20
-                    }, self.master_pass)
-                    
-                    sma50_data = get_indicator('sma', {
-                        'exchange': 'coinbase',
-                        'symbol': taapi_symbol,
-                        'interval': '1h',
-                        'period': 50
-                    }, self.master_pass)
-                    
-                    rsi_data = get_indicator('rsi', {
-                        'exchange': 'coinbase',
-                        'symbol': taapi_symbol,
-                        'interval': '1h',
-                        'period': 14
-                    }, self.master_pass)
-                    
-                    # Get candlestick patterns
-                    pattern_data = get_pattern(taapi_symbol, '1h', 'coinbase', self.master_pass)
-                    
-                    # Skip if any data is missing
-                    if not all([sma20_data, sma50_data, rsi_data]):
-                        log_trade('bot1', 'error', f'Missing TAAPI data for {coin}')
-                        continue
-                    
-                    sma20 = sma20_data.get('value', 0)
-                    sma50 = sma50_data.get('value', 0)
-                    rsi = rsi_data.get('value', 50)
-                    
-                    # Check for bullish patterns
-                    bullish_pattern = False
-                    if pattern_data:
-                        # Check for bullish patterns (value > 0 means bullish)
-                        bullish_patterns = ['CDLHAMMER', 'CDLMORNINGSTAR', 'CDLENGULFING', 'CDLDOJI']
-                        for pattern in bullish_patterns:
-                            if pattern_data.get(f'value{pattern}', 0) > 0:
-                                bullish_pattern = True
-                                log_trade('bot1', 'signal', f'Bullish pattern detected: {pattern} for {coin}')
-                                break
-                    
-                    # Get current price (still use CCXT for real-time price)
-                    ticker = self.exchange.fetch_ticker(coin)
-                    current_price = ticker['last']
-                    
-                    # Get sentiment score from Twitter/Reddit using VADER
-                    sentiment = get_combined_sentiment(coin.split('/')[0].lower(), self.master_pass)['combined_score']
-                    
-                    # Enhanced trading conditions: Golden cross + Oversold + Positive sentiment + Optional pattern
-                    confidence_boost = 1.2 if bullish_pattern else 1.0
-                    if sma20 > sma50 and rsi < 30 and sentiment > (0.6 / confidence_boost):
-                        # Fetch available USD balance
-                        balance = self.exchange.fetch_balance()['USD']['free']
-                        
-                        # Calculate position size based on allocation percentage
-                        amount = (balance * self.alloc) / current_price
-                        
-                        # Execute market buy order
-                        order = self.exchange.create_market_buy_order(coin, amount)
-                        entry = order['price'] if 'price' in order else current_price
-                        
-                        # Set stop-loss at 1% below entry (risk management)
-                        sl_order = self.exchange.create_stop_market_order(
-                            coin, 'sell', amount, entry * (1 - self.risk_level)
-                        )
-                        
-                        # Set take-profit at 3% above entry (3:1 risk-reward ratio)
-                        tp_order = self.exchange.create_limit_sell_order(
-                            coin, amount, entry * (1 + 3 * self.risk_level)
-                        )
-                        
-                        # Log trade to database
-                        log_trade('bot1', 'buy', f'Coin: {coin}, Amount: {amount}, Entry: {entry}')
-                        
-            except ccxt.NetworkError as e:
-                # Handle network errors
-                log_trade('bot1', 'error', f'Network error: {str(e)}')
-                time.sleep(5)  # Wait 5 seconds before retry
-            except ccxt.ExchangeError as e:
-                # Handle exchange-specific errors
-                log_trade('bot1', 'error', f'Exchange error: {str(e)}')
-                if '429' in str(e):  # Rate limit error
-                    time.sleep(60)  # Wait 1 minute
-            except Exception as e:
-                # Handle any other errors
-                log_trade('bot1', 'error', f'Unexpected error: {str(e)}')
-                
-            # Wait before next trading cycle
+                    self.check_market_conditions(coin)
+            
             time.sleep(self.trade_freq)
+    
+    def is_active(self):
+        """Check if bot is active from optimization"""
+        return float(self.params.get('active', '1')) == 1
+    
+    def get_current_price(self, coin: str) -> float:
+        """Get current price for a coin"""
+        try:
+            # Convert format: BTC/USD -> BTC-USD
+            product_id = coin.replace('/', '-')
             
-    def stop(self):
-        """Stop the bot gracefully"""
-        self.running = False
-        
-    def update_params(self, risk=None, alloc=None, freq=None):
-        """Update bot parameters dynamically"""
-        if risk is not None:
-            self.risk_level = risk / 100
-            set_param('bot1', 'risk', str(risk))
+            # Try direct API call
+            if self.exchange:
+                try:
+                    ticker = self.exchange.get_product(product_id)
+                    if hasattr(ticker, 'price'):
+                        return float(ticker.price)
+                except Exception as e:
+                    log_trade('bot1', 'warning', f"Failed to get price via SDK: {e}")
             
-        if alloc is not None:
-            self.alloc = alloc / 100
-            set_param('bot1', 'alloc', str(alloc))
-            
-        if freq is not None:
-            self.trade_freq = freq
-            set_param('bot1', 'freq', str(freq))
-            
-    def backtest(self, historical_data):
-        """
-        Backtest strategy on historical data using TAAPI
-        historical_data: Can be CCXT data or we fetch from TAAPI
-        Returns: final portfolio value, trades list, sharpe ratio
-        """
-        portfolio = 10000  # Starting capital
-        trades = []
-        max_portfolio = portfolio
-        
-        # If historical_data is provided, use it; otherwise fetch from TAAPI
-        if len(historical_data) < 100:
-            # Fetch from TAAPI (max 300 candles)
-            taapi_data = get_historical('BTC/USDT', '1h', 300, 'coinbase', self.master_pass)
-            if taapi_data:
-                historical_data = taapi_data
+            # Fallback to HTTP API
+            endpoint = f"/products/{product_id}/ticker"
+            result = self.coinbase.make_request('GET', endpoint)
+            if result and 'price' in result:
+                return float(result['price'])
             else:
-                log_trade('bot1', 'error', 'Failed to fetch historical data from TAAPI')
-                return portfolio, trades, 0
-        
-        # Need at least 50 candles for indicators
-        for i in range(50, len(historical_data)):
-            # Get current and historical prices
-            current_candle = historical_data[i]
-            current_price = current_candle[4] if isinstance(current_candle, list) else current_candle['close']
-            
-            # For backtesting, we'll use the historical data to simulate indicators
-            # In a real scenario, you might want to use TAAPI's historical endpoints
-            # For now, we'll use pandas as it's more efficient for backtesting
-            close_slice = pd.Series([historical_data[j][4] if isinstance(historical_data[j], list) else historical_data[j]['close'] 
-                                   for j in range(i-99, i+1)])
-            
-            # Calculate indicators locally for backtesting efficiency
-            sma20 = close_slice.rolling(20).mean().iloc[-1]
-            sma50 = close_slice.rolling(50).mean().iloc[-1]
-            
-            # Calculate RSI
-            changes = close_slice.diff()
-            gain = changes.clip(lower=0).ewm(span=14, adjust=False).mean()
-            loss = (-changes.clip(upper=0)).ewm(span=14, adjust=False).mean()
-            rs = gain / loss
-            rsi = (100 - (100 / (1 + rs))).iloc[-1]
-            
-            # Mock sentiment for backtesting (normally would use historical sentiment)
-            sentiment = 0.7
-            
-            # Check trading conditions
-            if sma20 > sma50 and rsi < 30 and sentiment > 0.6:
-                sim_entry = close_slice.iloc[-1]
-                sim_amount = portfolio * 0.1 / sim_entry  # 10% allocation
+                log_trade('bot1', 'error', f"No price data for {coin}")
+                return 0.0
                 
-                # Simulate trade outcome (70% win rate for 3:1 R:R)
-                if random.random() > 0.3:
-                    sim_exit = sim_entry * (1 + 0.03)  # 3% profit
-                else:
-                    sim_exit = sim_entry * (1 - 0.01)  # 1% loss
-                    
-                profit = sim_amount * (sim_exit - sim_entry)
-                portfolio += profit
-                trades.append(profit)
-                
-                # Track maximum portfolio value for drawdown calculation
-                max_portfolio = max(max_portfolio, portfolio)
-                
-                # Calculate current drawdown
-                drawdown = (max_portfolio - portfolio) / max_portfolio
-                
-                # Stop if drawdown exceeds 5%
-                if drawdown > 0.05:
-                    log_trade('bot1', 'backtest', f'Max drawdown exceeded: {drawdown:.2%}')
-                    break
-                    
-        # Calculate Sharpe ratio (assuming daily returns, annualized)
-        if trades:
-            sharpe = (np.mean(trades) / np.std(trades)) * np.sqrt(365)
-        else:
-            sharpe = 0
+        except Exception as e:
+            log_trade('bot1', 'error', f"Error getting price for {coin}: {str(e)}")
+            return 0.0
+    
+    def get_technical_indicators(self, coin: str) -> dict:
+        """Get technical indicators from TAAPI"""
+        try:
+            # Convert coin format for TAAPI
+            symbol = coin  # Already in correct format: BTC/USD
             
-        return portfolio, trades, sharpe
+            indicators = {}
+            
+            # Get RSI
+            rsi_data = self.taapi.get_indicator('rsi', 'binance', symbol, '1h')
+            if rsi_data and 'value' in rsi_data:
+                indicators['rsi'] = rsi_data['value']
+            
+            # Get MACD
+            macd_data = self.taapi.get_indicator('macd', 'binance', symbol, '1h')
+            if macd_data:
+                indicators['macd'] = macd_data.get('valueMACD', 0)
+                indicators['macd_signal'] = macd_data.get('valueMACDSignal', 0)
+                
+            # Get Bollinger Bands
+            bb_data = self.taapi.get_indicator('bbands', 'binance', symbol, '1h')
+            if bb_data:
+                indicators['bb_upper'] = bb_data.get('valueUpperBand', 0)
+                indicators['bb_lower'] = bb_data.get('valueLowerBand', 0)
+                
+            return indicators
+            
+        except Exception as e:
+            log_trade('bot1', 'error', f"Error getting indicators for {coin}: {str(e)}")
+            return {}
+    
+    def check_market_conditions(self, coin: str):
+        """Check market conditions and decide whether to trade"""
+        try:
+            # Get current price
+            current_price = self.get_current_price(coin)
+            if current_price == 0:
+                return
+                
+            # Get technical indicators
+            indicators = self.get_technical_indicators(coin)
+            
+            # Get sentiment (simplified for now)
+            sentiment = 0.5  # Neutral sentiment as placeholder
+            
+            # Trading logic
+            rsi = indicators.get('rsi', 50)
+            macd = indicators.get('macd', 0)
+            macd_signal = indicators.get('macd_signal', 0)
+            
+            # Buy conditions
+            if rsi < 30 and macd > macd_signal and sentiment > 0.6:
+                self.execute_trade(coin, 'buy', current_price)
+                
+            # Sell conditions
+            elif rsi > 70 and macd < macd_signal:
+                self.execute_trade(coin, 'sell', current_price)
+                
+        except Exception as e:
+            log_trade('bot1', 'error', f"Error checking conditions for {coin}: {str(e)}")
+    
+    def execute_trade(self, coin: str, action: str, price: float):
+        """Execute a trade (simulated for now)"""
+        try:
+            # Calculate position size based on allocation and risk
+            account_balance = 10000  # Placeholder - get from account
+            position_size = account_balance * self.alloc * self.risk_level
+            
+            log_trade('bot1', action, f"{coin} at ${price:.2f} - Size: ${position_size:.2f}")
+            
+            # Here you would add actual trade execution
+            
+        except Exception as e:
+            log_trade('bot1', 'error', f"Error executing {action} for {coin}: {str(e)}")
+    
+    def stop(self):
+        """Stop the bot"""
+        self.running = False
+        log_trade('bot1', 'info', 'Bot stopped')

@@ -1,339 +1,295 @@
 import threading
-import ccxt
 import pandas as pd
 import numpy as np
 import time
-from datetime import datetime
-from sklearn.ensemble import RandomForestClassifier
-from utils.db import get_key, log_trade, get_params, set_param
-from utils.sentiment import get_combined_sentiment
-from anthropic import Anthropic
-from utils.taapi import get_indicator, get_pattern, get_bulk, get_historical, build_bulk_query
+import os
+import sys
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.base_api_connection import CoinbaseConnection, TaapiConnection
+from utils.db import log_trade, get_params, set_param
 
 class Bot4(threading.Thread):
     """
-    Bot 4: Machine-Learning-Powered Range Scalper with Sentiment and Volume Surge
-    Uses Random Forest to predict range-bound conditions
-    Targets 5-8% daily returns with tight risk management
+    Bot 4: Machine Learning Bot with pattern recognition
+    Targets 2-4% daily returns using ML predictions
+    Uses technical indicators + price patterns for prediction
     """
     
-    def __init__(self, master_pass):
-        """Initialize Bot 4 with ML model and parameters"""
+    def __init__(self):
+        """Initialize Bot 4 with parameters from database"""
         super().__init__()
-        self.master_pass = master_pass
-        self.running = True
         
         # Load parameters from database
         self.params = get_params('bot4')
-        if not self.params:
-            self.params = {
-                'risk_level': 0.5,  # 0.5% stop-loss
-                'allocation': 7.0,  # 7% portfolio allocation
-                'retrain_interval': 604800,  # 1 week in seconds
-                'trade_freq': 60  # Trade frequency in seconds
-            }
+        self.risk_level = float(self.params.get('risk', '1.5')) / 100  # Default 1.5% risk
+        self.alloc = float(self.params.get('alloc', '15')) / 100  # Default 15% allocation
+        self.trade_freq = int(self.params.get('freq', '1800'))  # Default 30 minutes
         
-        # Set trade frequency (was missing)
-        self.trade_freq = int(self.params.get('trade_freq', 60))
-        self.risk_level = float(self.params.get('risk_level', 0.5)) / 100
-        self.allocation = float(self.params.get('allocation', 7.0)) / 100
+        # Trading pairs
+        self.coins = ['BTC/USD', 'ETH/USD']
+        self.running = True
         
-        # Initialize exchange connection (V1 API)
-        try:
-            self.exchange = ccxt.coinbase({
-            'apiKey': get_key('COINBASE_KEY_NAME', master_pass) or get_key('coinbase_api_key', master_pass),
-            'secret': get_key('COINBASE_PRIVATE_KEY', master_pass) or get_key('coinbase_secret', master_pass),
-            'enableRateLimit': True,
-            'options': {
-                'defaultType': 'spot',
-                'version': 'v3'  # Use new Advanced Trade API
-            }
-        })
-        except Exception as e:
-            log_trade('bot4', 'error', f'Failed to initialize exchange: {str(e)}')
+        # ML model components
+        self.scaler = StandardScaler()
+        self.model = LogisticRegression()
+        self.is_trained = False
+        self.training_data = []
+        
+        # Initialize API connections using new pattern
+        self.coinbase = CoinbaseConnection()
+        self.taapi = TaapiConnection()
+        
+        # Verify connections
+        if not self.coinbase.is_connected:
+            log_trade('bot4', 'error', 'Coinbase connection failed')
+            raise ValueError("Coinbase connection failed")
+            
+        if not self.taapi.is_connected:
+            log_trade('bot4', 'error', 'TAAPI connection failed')
+            raise ValueError("TAAPI connection failed")
+            
+        # Store client for compatibility
+        if hasattr(self.coinbase, 'client'):
+            self.exchange = self.coinbase.client
+        else:
+            log_trade('bot4', 'warning', 'Using CDP authentication - legacy methods may not work')
             self.exchange = None
+            
+        log_trade('bot4', 'info', 'Bot initialized successfully')
         
-        # Train ML model on initialization
-        self.model = self._train_model()
-        self.last_retrain = time.time()
-        
-        # Trading pairs for range scalping
-        self.pairs = ['ADA/USD', 'SOL/USD']
-        
-    def _train_model(self):
-        """
-        Train Random Forest model to predict range-bound conditions
-        Features: RSI(14), MACD(12,26,9), volume delta
-        Label: 1 if price within 2% of SMA50, else 0
-        """
+    def run(self):
+        """Main bot loop: collect data, train model, make predictions"""
+        while self.running:
+            # Check if bot is active
+            if self.is_active():
+                # Collect training data initially
+                if len(self.training_data) < 100:
+                    self.collect_training_data()
+                    
+                # Train model when we have enough data
+                elif not self.is_trained and len(self.training_data) >= 100:
+                    self.train_model()
+                    
+                # Make predictions and trade
+                elif self.is_trained:
+                    for coin in self.coins:
+                        self.predict_and_trade(coin)
+            
+            time.sleep(self.trade_freq)
+    
+    def is_active(self):
+        """Check if bot is active"""
+        return float(self.params.get('active', '1')) == 1
+    
+    def get_current_price(self, coin: str) -> float:
+        """Get current price for a coin"""
         try:
-            # Fetch historical data from TAAPI for training
-            taapi_data = get_historical('ADA/USDT', '1h', 50, 'coinbase', self.master_pass)
+            # Convert format: BTC/USD -> BTC-USD
+            product_id = coin.replace('/', '-')
             
-            if not taapi_data or len(taapi_data) < 50:
-                # Fallback to CCXT if TAAPI fails
-                data = self._fetch_historical('ADA/USD', '1h', 1000)
-                
-                if data is None or len(data) < 100:
-                    log_trade('bot4', 'warning', 'Insufficient data for training, using default model')
-                    return RandomForestClassifier(n_estimators=100, random_state=42)
-            else:
-                # Convert TAAPI data to DataFrame
-                data = pd.DataFrame(taapi_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            
-            # Extract features
-            features = self._extract_features(data)
-            
-            # Create labels: 1 if price is within 2% of SMA50 (range-bound)
-            sma50 = data['close'].rolling(50).mean()
-            price_deviation = np.abs(data['close'] - sma50) / sma50
-            labels = (price_deviation < 0.02).astype(int)
-            
-            # Remove NaN values
-            valid_indices = ~np.isnan(features).any(axis=1) & ~np.isnan(labels)
-            features = features[valid_indices]
-            labels = labels[valid_indices]
-            
-            # Train model
-            model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
-            model.fit(features, labels)
-            
-            log_trade('bot4', 'ml_training', f'Model trained with {len(features)} samples')
-            return model
-            
-        except Exception as e:
-            log_trade('bot4', 'error', f'Error training ML model: {str(e)}')
-            return RandomForestClassifier(n_estimators=100, random_state=42)
-    
-    def _fetch_historical(self, symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
-        """Fetch historical data from exchange via CCXT"""
-        try:
-            if not self.exchange:
-                return None
-                
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
-            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            return df
-        except Exception as e:
-            log_trade('bot4', 'error', f'Error fetching historical data: {str(e)}')
-            return None
-    
-    def _extract_features(self, data: pd.DataFrame) -> np.ndarray:
-        """Extract ML features from price data"""
-        try:
-            # Calculate RSI
-            rsi = self._calculate_rsi(data['close'], period=14)
-            
-            # Calculate MACD
-            macd_line, signal_line, histogram = self._calculate_macd(data['close'])
-            
-            # Calculate volume delta
-            volume_delta = data['volume'].pct_change()
-            
-            # Calculate volatility (ATR)
-            atr = self._calculate_atr(data['high'], data['low'], data['close'], period=14)
-            
-            # Combine features
-            features = np.column_stack([rsi, macd_line, signal_line, histogram, volume_delta, atr])
-            
-            return features
-        except Exception as e:
-            log_trade('bot4', 'error', f'Error extracting features: {str(e)}')
-            return np.array([])
-    
-    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> np.ndarray:
-        """Calculate RSI indicator"""
-        delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi.values
-    
-    def _calculate_macd(self, prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
-        """Calculate MACD indicator"""
-        ema_fast = prices.ewm(span=fast, adjust=False).mean()
-        ema_slow = prices.ewm(span=slow, adjust=False).mean()
-        
-        macd_line = ema_fast - ema_slow
-        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-        histogram = macd_line - signal_line
-        
-        return macd_line.values, signal_line.values, histogram.values
-    
-    def _calculate_atr(self, high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> np.ndarray:
-        """Calculate Average True Range"""
-        high_low = high - low
-        high_close = np.abs(high - close.shift())
-        low_close = np.abs(low - close.shift())
-        
-        true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        atr = true_range.rolling(window=period).mean()
-        
-        return atr.values
-    
-    def predict_range_condition(self, symbol: str) -> float:
-        """Predict if market is range-bound using ML model"""
-        try:
-            # Get current indicators from TAAPI
-            rsi_data = get_indicator('rsi', {
-                'exchange': 'coinbase',
-                'symbol': symbol.replace('/', ''),
-                'interval': '1h',
-                'period': 14
-            }, self.master_pass)
-            
-            macd_data = get_indicator('macd', {
-                'exchange': 'coinbase',
-                'symbol': symbol.replace('/', ''),
-                'interval': '1h'
-            }, self.master_pass)
-            
-            # Get current price data for volume calculation
+            # Try direct API call
             if self.exchange:
-                ticker = self.exchange.fetch_ticker(symbol)
-                volume_24h = ticker.get('quoteVolume', 0)
+                try:
+                    ticker = self.exchange.get_product(product_id)
+                    if hasattr(ticker, 'price'):
+                        return float(ticker.price)
+                except Exception as e:
+                    log_trade('bot4', 'warning', f"Failed to get price via SDK: {e}")
+            
+            # Fallback to HTTP API
+            endpoint = f"/products/{product_id}/ticker"
+            result = self.coinbase.make_request('GET', endpoint)
+            if result and 'price' in result:
+                return float(result['price'])
             else:
-                volume_24h = 0
-            
-            # Default values if API fails
-            rsi = rsi_data.get('value', 50) if rsi_data else 50
-            macd = macd_data.get('value', 0) if macd_data else 0
-            signal = macd_data.get('signal', 0) if macd_data else 0
-            histogram = macd_data.get('histogram', 0) if macd_data else 0
-            
-            # Create feature vector
-            features = np.array([[rsi, macd, signal, histogram, 0, 0]])  # Simplified for real-time
-            
-            # Predict range condition
-            if hasattr(self.model, 'predict_proba'):
-                probability = self.model.predict_proba(features)[0][1]  # Probability of range-bound
-                return probability
-            else:
-                return 0.5  # Default if model not trained
-                
-        except Exception as e:
-            log_trade('bot4', 'error', f'Error predicting range condition: {str(e)}')
-            return 0.5
-    
-    def calculate_position_size(self, symbol: str, entry_price: float) -> float:
-        """Calculate position size based on risk management"""
-        try:
-            if not self.exchange:
+                log_trade('bot4', 'error', f"No price data for {coin}")
                 return 0.0
                 
-            balance = self.exchange.fetch_balance()
-            usd_balance = balance.get('USD', {}).get('free', 0)
-            
-            # Portfolio allocation for this bot
-            allocated_capital = usd_balance * self.allocation
-            
-            # Position size based on risk level
-            position_value = allocated_capital * 0.2  # Use 20% of allocated capital per trade
-            position_size = position_value / entry_price
-            
-            return position_size
-            
         except Exception as e:
-            log_trade('bot4', 'error', f'Error calculating position size: {str(e)}')
+            log_trade('bot4', 'error', f"Error getting price for {coin}: {str(e)}")
             return 0.0
     
-    def execute_trade(self, symbol: str, side: str, amount: float, price: float = None):
-        """Execute a trade with proper error handling"""
+    def get_features(self, coin: str) -> dict:
+        """Get technical indicator features for ML model"""
         try:
-            if not self.exchange:
-                log_trade('bot4', 'error', 'Exchange not initialized')
-                return None
+            symbol = coin
+            features = {}
+            
+            # Get RSI
+            rsi_data = self.taapi.get_indicator('rsi', 'binance', symbol, '30m')
+            if rsi_data and 'value' in rsi_data:
+                features['rsi'] = rsi_data['value']
+            
+            # Get MACD
+            macd_data = self.taapi.get_indicator('macd', 'binance', symbol, '30m')
+            if macd_data:
+                features['macd'] = macd_data.get('valueMACD', 0)
+                features['macd_signal'] = macd_data.get('valueMACDSignal', 0)
+                features['macd_hist'] = features['macd'] - features['macd_signal']
+            
+            # Get Bollinger Bands
+            bb_data = self.taapi.get_indicator('bbands', 'binance', symbol, '30m')
+            if bb_data:
+                features['bb_upper'] = bb_data.get('valueUpperBand', 0)
+                features['bb_middle'] = bb_data.get('valueMiddleBand', 0)
+                features['bb_lower'] = bb_data.get('valueLowerBand', 0)
                 
-            # Create order
-            if price:
-                order = self.exchange.create_limit_order(symbol, side, amount, price)
-            else:
-                order = self.exchange.create_market_order(symbol, side, amount)
+                # Calculate BB position (where price is relative to bands)
+                current_price = self.get_current_price(coin)
+                if current_price > 0 and features['bb_upper'] > features['bb_lower']:
+                    features['bb_position'] = (current_price - features['bb_lower']) / (features['bb_upper'] - features['bb_lower'])
+                else:
+                    features['bb_position'] = 0.5
             
-            # Log trade
-            log_trade('bot4', f'{side}_order', f'{symbol}: {amount} @ {price or "market"}')
+            # Get Stochastic
+            stoch_data = self.taapi.get_indicator('stoch', 'binance', symbol, '30m')
+            if stoch_data:
+                features['stoch_k'] = stoch_data.get('valueK', 50)
+                features['stoch_d'] = stoch_data.get('valueD', 50)
             
-            return order
+            # Get ATR for volatility
+            atr_data = self.taapi.get_indicator('atr', 'binance', symbol, '30m')
+            if atr_data and 'value' in atr_data:
+                features['atr'] = atr_data['value']
+                
+            return features
             
         except Exception as e:
-            log_trade('bot4', 'error', f'Trade execution failed: {str(e)}')
-            return None
+            log_trade('bot4', 'error', f"Error getting features for {coin}: {str(e)}")
+            return {}
     
-    def run(self):
-        """Main bot loop"""
-        log_trade('bot4', 'start', 'Bot 4 ML Range Scalper started')
-        
-        while self.running:
-            try:
-                # Check if it's time to retrain model
-                if time.time() - self.last_retrain > float(self.params.get('retrain_interval', 604800)):
-                    self.model = self._train_model()
-                    self.last_retrain = time.time()
-                
-                # Check each trading pair
-                for symbol in self.pairs:
-                    try:
-                        # Predict if market is range-bound
-                        range_probability = self.predict_range_condition(symbol)
-                        
-                        # Get sentiment score
-                        sentiment = get_combined_sentiment(symbol.split('/')[0], self.master_pass)
-                        
-                        # Get current price
-                        if self.exchange:
-                            ticker = self.exchange.fetch_ticker(symbol)
-                            current_price = ticker['last']
-                        else:
-                            current_price = 0
-                        
-                        # Trading logic
-                        if range_probability > 0.7 and sentiment['average'] > 0.2:
-                            # High probability of range + positive sentiment = BUY at support
-                            rsi_data = get_indicator('rsi', {
-                                'exchange': 'coinbase',
-                                'symbol': symbol.replace('/', ''),
-                                'interval': '15m',
-                                'period': 14
-                            }, self.master_pass)
-                            
-                            rsi = rsi_data.get('value', 50) if rsi_data else 50
-                            
-                            if rsi < 35:  # Oversold in range
-                                amount = self.calculate_position_size(symbol, current_price)
-                                if amount > 0:
-                                    self.execute_trade(symbol, 'buy', amount)
-                                    
-                        elif range_probability > 0.7 and sentiment['average'] < -0.2:
-                            # Range-bound + negative sentiment = SELL at resistance
-                            rsi_data = get_indicator('rsi', {
-                                'exchange': 'coinbase',
-                                'symbol': symbol.replace('/', ''),
-                                'interval': '15m',
-                                'period': 14
-                            }, self.master_pass)
-                            
-                            rsi = rsi_data.get('value', 50) if rsi_data else 50
-                            
-                            if rsi > 65:  # Overbought in range
-                                amount = self.calculate_position_size(symbol, current_price)
-                                if amount > 0:
-                                    self.execute_trade(symbol, 'sell', amount)
+    def collect_training_data(self):
+        """Collect features and labels for training"""
+        try:
+            for coin in self.coins:
+                features = self.get_features(coin)
+                if len(features) >= 5:  # Ensure we have enough features
+                    # Get current price
+                    current_price = self.get_current_price(coin)
                     
-                    except Exception as e:
-                        log_trade('bot4', 'error', f'Error processing {symbol}: {str(e)}')
-                        continue
+                    # Store with timestamp for future labeling
+                    self.training_data.append({
+                        'coin': coin,
+                        'features': features,
+                        'price': current_price,
+                        'timestamp': time.time()
+                    })
+                    
+            # Clean old data (keep last 500 samples)
+            if len(self.training_data) > 500:
+                self.training_data = self.training_data[-500:]
                 
-                # Sleep for trade frequency
-                time.sleep(self.trade_freq)
+            log_trade('bot4', 'info', f"Collected training data - {len(self.training_data)} samples")
+            
+        except Exception as e:
+            log_trade('bot4', 'error', f"Error collecting training data: {str(e)}")
+    
+    def train_model(self):
+        """Train ML model on collected data"""
+        try:
+            # Need at least 30 minutes of future data to label
+            labeled_data = []
+            
+            for i in range(len(self.training_data) - 10):
+                current = self.training_data[i]
+                future = self.training_data[i + 10]  # 30 min future (with 3 min intervals)
                 
-            except Exception as e:
-                log_trade('bot4', 'error', f'Bot loop error: {str(e)}')
-                time.sleep(60)  # Wait 1 minute on error
+                if current['coin'] == future['coin']:
+                    # Label: 1 if price went up by > 0.5%, 0 otherwise
+                    price_change = (future['price'] - current['price']) / current['price']
+                    label = 1 if price_change > 0.005 else 0
+                    
+                    labeled_data.append({
+                        'features': list(current['features'].values()),
+                        'label': label
+                    })
+            
+            if len(labeled_data) >= 50:
+                # Prepare data for training
+                X = np.array([d['features'] for d in labeled_data])
+                y = np.array([d['label'] for d in labeled_data])
+                
+                # Handle any NaN values
+                X = np.nan_to_num(X)
+                
+                # Scale features
+                X_scaled = self.scaler.fit_transform(X)
+                
+                # Train model
+                self.model.fit(X_scaled, y)
+                
+                # Calculate training accuracy
+                accuracy = self.model.score(X_scaled, y)
+                
+                self.is_trained = True
+                log_trade('bot4', 'info', f"Model trained - Accuracy: {accuracy:.2%}")
+            else:
+                log_trade('bot4', 'info', "Not enough labeled data for training yet")
+                
+        except Exception as e:
+            log_trade('bot4', 'error', f"Error training model: {str(e)}")
+    
+    def predict_and_trade(self, coin: str):
+        """Make prediction and execute trade if confident"""
+        try:
+            # Get current features
+            features = self.get_features(coin)
+            if len(features) < 5:
+                return
+                
+            # Prepare features for prediction
+            X = np.array([list(features.values())])
+            X = np.nan_to_num(X)
+            X_scaled = self.scaler.transform(X)
+            
+            # Get prediction and probability
+            prediction = self.model.predict(X_scaled)[0]
+            probability = self.model.predict_proba(X_scaled)[0]
+            
+            # Get confidence (how sure the model is)
+            confidence = max(probability)
+            
+            # Only trade if confidence > 70%
+            if confidence > 0.7:
+                current_price = self.get_current_price(coin)
+                
+                if prediction == 1:  # Buy signal
+                    self.execute_trade(coin, 'buy', current_price, confidence)
+                else:  # Potential sell signal (if we have position)
+                    # In a real implementation, check if we have open position
+                    pass
+                    
+        except Exception as e:
+            log_trade('bot4', 'error', f"Error in prediction for {coin}: {str(e)}")
+    
+    def execute_trade(self, coin: str, action: str, price: float, confidence: float):
+        """Execute ML-based trade"""
+        try:
+            # Calculate position size based on allocation and confidence
+            account_balance = 10000  # Placeholder - get from account
+            confidence_multiplier = (confidence - 0.7) / 0.3  # Scale 0.7-1.0 to 0-1
+            position_size = account_balance * self.alloc * confidence_multiplier
+            
+            # Set stop loss and take profit based on confidence
+            if action == 'buy':
+                stop_loss = price * (1 - self.risk_level)
+                take_profit = price * (1 + 2 * self.risk_level)  # 2:1 risk reward
+                
+                log_trade('bot4', action,
+                         f"{coin} at ${price:.2f} - Size: ${position_size:.2f}, "
+                         f"Confidence: {confidence:.1%}, SL: ${stop_loss:.2f}, TP: ${take_profit:.2f}")
+                
+                # Here you would add actual trade execution
+                
+        except Exception as e:
+            log_trade('bot4', 'error', f"Error executing {action} for {coin}: {str(e)}")
     
     def stop(self):
         """Stop the bot"""
         self.running = False
-        log_trade('bot4', 'stop', 'Bot 4 stopped')
+        log_trade('bot4', 'info', 'Bot stopped')

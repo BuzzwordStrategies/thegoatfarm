@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Health - GOAT Farm</title>
+    <link rel="stylesheet" href="../styles/glassmorphism.css">
+</head>
+<body>
+    <!-- Include Sidebar -->
+    <div id="sidebar-container"></div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="glass-card">
+            <h1>API Health Monitor</h1>
+            <p class="text-secondary">Real-time status of all API connections</p>
+        </div>
+        
+        <div class="api-health-grid" id="api-health-grid">
+            <!-- API health items will be dynamically inserted here -->
+        </div>
+        
+        <div class="glass-card">
+            <h2>Connection Details</h2>
+            <div id="connection-details">
+                <p class="text-secondary">Select an API to view connection details</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // API configurations
+    const apis = [
+        { name: 'Coinbase', key: 'coinbase', endpoint: '/api/health/coinbase' },
+        { name: 'TAAPI', key: 'taapi', endpoint: '/api/health/taapi' },
+        { name: 'Twitter', key: 'twitter', endpoint: '/api/health/twitter' },
+        { name: 'ScrapingBee', key: 'scrapingbee', endpoint: '/api/health/scrapingbee' },
+        { name: 'CoinDesk', key: 'coindesk', endpoint: '/api/health/coindesk' },
+        { name: 'Anthropic', key: 'anthropic', endpoint: '/api/health/anthropic' },
+        { name: 'Perplexity', key: 'perplexity', endpoint: '/api/health/perplexity' },
+        { name: 'Grok/XAI', key: 'grok', endpoint: '/api/health/grok' }
+    ];
+    
+    // Create API health items
+    function createAPIHealthItems() {
+        const grid = document.getElementById('api-health-grid');
+        
+        apis.forEach(api => {
+            const item = document.createElement('div');
+            item.className = 'api-health-item';
+            item.id = `health-${api.key}`;
+            item.innerHTML = `
+                <h3>${api.name}</h3>
+                <div class="api-status offline" id="status-${api.key}"></div>
+                <p class="status-text" id="text-${api.key}">Checking...</p>
+                <p class="last-check" id="time-${api.key}">-</p>
+                <p class="rate-limit" id="rate-${api.key}"></p>
+                <button class="btn" onclick="reconnectAPI('${api.key}')">Reconnect</button>
+            `;
+            item.onclick = () => showDetails(api.key);
+            grid.appendChild(item);
+        });
+    }
+    
+    // Check API health
+    async function checkAPIHealth() {
+        for (const api of apis) {
+            try {
+                const response = await fetch(api.endpoint);
+                const data = await response.json();
+                
+                const statusEl = document.getElementById(`status-${api.key}`);
+                const textEl = document.getElementById(`text-${api.key}`);
+                const timeEl = document.getElementById(`time-${api.key}`);
+                const rateEl = document.getElementById(`rate-${api.key}`);
+                const itemEl = document.getElementById(`health-${api.key}`);
+                
+                if (data.status === 'online') {
+                    statusEl.classList.remove('offline');
+                    statusEl.classList.add('online');
+                    textEl.textContent = 'Connected';
+                    itemEl.classList.remove('error');
+                    
+                    // Show rate limit if available
+                    if (data.rateLimit) {
+                        rateEl.textContent = `Rate: ${data.rateLimit.remaining}/${data.rateLimit.limit}`;
+                    }
+                } else {
+                    statusEl.classList.remove('online');
+                    statusEl.classList.add('offline');
+                    textEl.textContent = data.error || 'Disconnected';
+                    itemEl.classList.add('error');
+                }
+                
+                timeEl.textContent = new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                const statusEl = document.getElementById(`status-${api.key}`);
+                const textEl = document.getElementById(`text-${api.key}`);
+                const itemEl = document.getElementById(`health-${api.key}`);
+                
+                statusEl.classList.remove('online');
+                statusEl.classList.add('offline');
+                textEl.textContent = 'Connection Error';
+                itemEl.classList.add('error');
+            }
+        }
+    }
+    
+    // Reconnect API
+    async function reconnectAPI(apiKey) {
+        const textEl = document.getElementById(`text-${apiKey}`);
+        textEl.textContent = 'Reconnecting...';
+        
+        try {
+            const response = await fetch(`/api/reconnect/${apiKey}`, { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.success) {
+                textEl.textContent = 'Reconnected!';
+                setTimeout(() => checkAPIHealth(), 1000);
+            } else {
+                textEl.textContent = 'Reconnection failed';
+            }
+        } catch (error) {
+            textEl.textContent = 'Reconnection error';
+        }
+    }
+    
+    // Show API details
+    function showDetails(apiKey) {
+        const detailsEl = document.getElementById('connection-details');
+        
+        // Mock details for now - in production, fetch from API
+        detailsEl.innerHTML = `
+            <h3>${apiKey.toUpperCase()} Connection Details</h3>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value" id="detail-status-${apiKey}">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Last Response Time:</span>
+                    <span class="detail-value" id="detail-response-${apiKey}">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Total Requests:</span>
+                    <span class="detail-value" id="detail-requests-${apiKey}">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Error Rate:</span>
+                    <span class="detail-value" id="detail-errors-${apiKey}">-</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Load sidebar
+    async function loadSidebar() {
+        try {
+            const response = await fetch('../components/sidebar.html');
+            const html = await response.text();
+            document.getElementById('sidebar-container').innerHTML = html;
+        } catch (error) {
+            console.error('Failed to load sidebar:', error);
+        }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSidebar();
+        createAPIHealthItems();
+        checkAPIHealth();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(checkAPIHealth, 10000);
+    });
+    </script>
+    
+    <style>
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .detail-item {
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+    }
+    
+    .detail-label {
+        color: var(--text-secondary);
+        display: block;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .detail-value {
+        color: var(--text-primary);
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    
+    .status-text {
+        font-weight: 500;
+        margin: 0.5rem 0;
+    }
+    
+    .last-check {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin: 0.25rem 0;
+    }
+    
+    .rate-limit {
+        font-size: 0.85rem;
+        color: var(--accent-blue);
+        margin: 0.5rem 0;
+        height: 1.2em;
+    }
+    
+    .api-health-item {
+        cursor: pointer;
+    }
+    
+    .api-health-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    </style>
+</body>
+</html> 

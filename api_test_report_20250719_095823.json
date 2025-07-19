@@ -1,0 +1,75 @@
+{
+  "timestamp": "2025-07-19T09:58:21.136573",
+  "environment": "development",
+  "results": {
+    "Coinbase": {
+      "success": true,
+      "message": "CDP keys found",
+      "details": {
+        "auth_type": "CDP",
+        "key_name": "organizations/cd8d54..."
+      },
+      "timestamp": "2025-07-19T09:58:21.137762"
+    },
+    "TAAPI": {
+      "success": true,
+      "message": "Connected - RSI: 46.92323646732601",
+      "details": {
+        "endpoint": "RSI",
+        "value": 46.92323646732601
+      },
+      "timestamp": "2025-07-19T09:58:21.467635"
+    },
+    "Twitter": {
+      "success": true,
+      "message": "API key found",
+      "details": {
+        "base_url": "https://api.twitterapi.io/v1",
+        "key_prefix": "58353bde94..."
+      },
+      "timestamp": "2025-07-19T09:58:21.871705"
+    },
+    "ScrapingBee": {
+      "success": true,
+      "message": "Connected - Credits: 1000",
+      "details": {
+        "max_credits": 1000,
+        "used_credits": 0
+      },
+      "timestamp": "2025-07-19T09:58:22.392324"
+    },
+    "CoinDesk": {
+      "success": false,
+      "message": "Connection failed: HTTPSConnectionPool(host='api.coindesk.com', port=443): Max retries exceeded with url: /v1/bpi/currentprice.json (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001CA060A1250>: Failed to resolve 'api.coindesk.com' ([Errno 11001] getaddrinfo failed)\"))",
+      "details": {},
+      "timestamp": "2025-07-19T09:58:22.416310"
+    },
+    "Anthropic": {
+      "success": false,
+      "message": "Connection failed: Client.__init__() got an unexpected keyword argument 'proxies'",
+      "details": {},
+      "timestamp": "2025-07-19T09:58:23.163801"
+    },
+    "Perplexity": {
+      "success": true,
+      "message": "API key found",
+      "details": {
+        "key_prefix": "pplx-vm8ZJ..."
+      },
+      "timestamp": "2025-07-19T09:58:23.163801"
+    },
+    "Grok/XAI": {
+      "success": true,
+      "message": "API key found",
+      "details": {
+        "key_prefix": "xai-WhWV7M..."
+      },
+      "timestamp": "2025-07-19T09:58:23.163801"
+    }
+  },
+  "summary": {
+    "total": 8,
+    "passed": 6,
+    "failed": 2
+  }
+}

@@ -92,11 +92,24 @@ def get_env_key(key_type: str) -> str:
     env_mappings = {
         'coinbase_api_key': 'COINBASE_API_KEY',
         'coinbase_secret': 'COINBASE_API_SECRET',
+        'COINBASE_CDP_API_KEY_NAME': 'COINBASE_API_KEY_NAME',
+        'COINBASE_CDP_API_KEY_SECRET': 'COINBASE_API_KEY_PRIVATE_KEY',
+        'COINBASE_API_KEY': 'COINBASE_API_KEY',
+        'COINBASE_API_SECRET': 'COINBASE_API_SECRET',
         'taapi_key': 'TAAPI_SECRET',
+        'TAAPI_SECRET': 'TAAPI_SECRET',
         'grok_api_key': 'XAI_API_KEY',
+        'XAI_API_KEY': 'XAI_API_KEY',
         'perplexity_api_key': 'PERPLEXITY_API_KEY',
+        'PERPLEXITY_API_KEY': 'PERPLEXITY_API_KEY',
         'claude_api_key': 'ANTHROPIC_API_KEY',
+        'ANTHROPIC_API_KEY': 'ANTHROPIC_API_KEY',
         'coindesk_api_key': 'COINDESK_API_URL',
+        'twitterapi_key': 'TWITTERAPI_KEY',
+        'TWITTERAPI_KEY': 'TWITTERAPI_KEY',
+        'TWITTER_API_KEY': 'TWITTER_API_KEY',
+        'scrapingbee_api_key': 'SCRAPINGBEE_API_KEY',
+        'SCRAPINGBEE_API_KEY': 'SCRAPINGBEE_API_KEY',
     }
     
     env_var = env_mappings.get(key_type)
@@ -105,8 +118,11 @@ def get_env_key(key_type: str) -> str:
     return ''
 
 def get_master_password() -> str:
-    """Get master password from environment or use default"""
-    return env_loader.get('MASTER_PASSWORD', 'March3392!')
+    """Get master password from environment"""
+    password = env_loader.get('MASTER_PASSWORD')
+    if not password:
+        raise ValueError("MASTER_PASSWORD environment variable is required but not set")
+    return password
 
 def load_all_env_keys() -> dict:
     """Load all API keys from environment variables"""
