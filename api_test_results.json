@@ -1,0 +1,42 @@
+{
+  "Coinbase API": {
+    "success": false,
+    "message": "Error: No module named 'coinbase'",
+    "timestamp": "2025-07-18T21:33:54.128320"
+  },
+  "TAAPI.io": {
+    "success": false,
+    "message": "Error: Missing TAAPI secret",
+    "timestamp": "2025-07-18T21:33:54.128320"
+  },
+  "TwitterAPI.io": {
+    "success": false,
+    "message": "Error: Missing TwitterAPI key",
+    "timestamp": "2025-07-18T21:33:54.128843"
+  },
+  "ScrapingBee": {
+    "success": false,
+    "message": "Error: No module named 'scrapingbee'",
+    "timestamp": "2025-07-18T21:33:54.129386"
+  },
+  "Grok API": {
+    "success": false,
+    "message": "Error: No module named 'openai'",
+    "timestamp": "2025-07-18T21:33:54.129905"
+  },
+  "Perplexity AI": {
+    "success": false,
+    "message": "Error: No module named 'openai'",
+    "timestamp": "2025-07-18T21:33:54.129905"
+  },
+  "Anthropic Claude": {
+    "success": false,
+    "message": "Error: Client.__init__() got an unexpected keyword argument 'proxies'",
+    "timestamp": "2025-07-18T21:33:54.472868"
+  },
+  "CoinDesk API": {
+    "success": false,
+    "message": "Error: HTTPSConnectionPool(host='api.coindesk.com', port=443): Max retries exceeded with url: /v1/bpi/currentprice.json (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x0000017B204DDF50>: Failed to resolve 'api.coindesk.com' ([Errno 11001] getaddrinfo failed)\"))",
+    "timestamp": "2025-07-18T21:33:54.500477"
+  }
+}

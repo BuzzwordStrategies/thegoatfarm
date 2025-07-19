@@ -236,7 +236,11 @@ class BaseAPIClient {
       successRate: this.metrics.totalRequests > 0
         ? (this.metrics.successfulRequests / this.metrics.totalRequests) * 100
         : 0,
-      circuitBreakerState: this.circuitBreaker.stats()
+      circuitBreakerState: {
+        state: this.circuitBreaker.opened ? 'open' : (this.circuitBreaker.halfOpen ? 'half-open' : 'closed'),
+        enabled: this.circuitBreaker.enabled,
+        pendingClose: this.circuitBreaker.pendingClose
+      }
     };
   }
   
@@ -251,4 +255,4 @@ class BaseAPIClient {
   }
 }
 
-module.exports = BaseAPIClient; 
+module.exports = BaseAPIClient;

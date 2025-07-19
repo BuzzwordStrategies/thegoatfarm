@@ -85,3 +85,10 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Encryption key
+.encryption_key
+
+# Test results
+test_results/
+*.pytest_cache/

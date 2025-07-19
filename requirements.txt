@@ -1,14 +1,42 @@
-flask==3.0.3
-tweepy==4.14.0
-praw==7.7.1
-vaderSentiment==3.3.2
-textblob==0.18.0.post0
-requests==2.32.3
-ccxt==4.3.67
-scikit-learn==1.5.1
-pandas==2.2.2
-numpy==2.0.1
-matplotlib==3.9.0
-cryptography==43.0.0  # For key encryption
-anthropic==0.28.0  # For portfolio optimization
-python-dotenv==1.0.0
+# Core Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-SocketIO==5.3.6
+python-socketio==5.11.0
+
+# Coinbase Official SDK (replacing CCXT)
+coinbase-advanced-py==1.2.1
+
+# API Clients
+requests==2.31.0
+websocket-client==1.7.0
+aiohttp==3.9.3
+
+# AI/ML APIs
+anthropic==0.21.3
+openai==1.12.0
+
+# Data Processing
+pandas==2.2.0
+numpy==1.26.4
+ta==0.11.0
+scikit-learn==1.4.0
+
+# Database
+pymongo==4.6.1
+redis==5.0.1
+
+# Security
+cryptography==42.0.2
+python-dotenv==1.0.1
+jwt==1.3.1
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2024.1
+colorama==0.4.6
+tqdm==4.66.1
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.4

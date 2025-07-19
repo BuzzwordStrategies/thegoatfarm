@@ -10,7 +10,17 @@ from anthropic import Anthropic
 import time
 import json
 import numpy as np
-import ccxt
+# import ccxt  # Removed - using Coinbase SDK
+
+# Mock ccxt for compatibility until full migration
+class MockExchange:
+    def fetch_balance(self):
+        return {'total': {'USD': 0.0}}
+    def fetch_ticker(self, symbol):
+        return {'last': 0.0}
+
+# Replace ccxt usage
+
 import requests
 import os
 from dotenv import load_dotenv
